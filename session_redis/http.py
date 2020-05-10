@@ -21,11 +21,6 @@ except ImportError:
     redis = None  # noqa
     _logger.debug("Cannot 'import redis'.")
 
-
-def is_true(strval):
-    return bool(strtobool(strval or '0'.lower()))
-
-
 sentinel_host = os.environ.get('ODOO_SESSION_REDIS_SENTINEL_HOST')
 sentinel_master_name = os.environ.get(
     'ODOO_SESSION_REDIS_SENTINEL_MASTER_NAME'
@@ -67,6 +62,14 @@ def session_gc(session_store):
     return
 
 
+def is_true(key):
+    """ Convert string value of an env variable to boolean """
+    try:
+        return strtobool(os.environ.get(key))
+    except ValueError:
+        return False
+
+
 def purge_fs_sessions(path):
     for fname in os.listdir(path):
         path = os.path.join(path, fname)
@@ -79,7 +82,9 @@ def purge_fs_sessions(path):
 def copy_fs_sessions(path):
     from odoo.http import OpenERPSession
     from werkzeug.contrib.sessions import FilesystemSessionStore
-    werkzeug_session_store = FilesystemSessionStore(path, session_class=OpenERPSession)
+    werkzeug_session_store = FilesystemSessionStore(
+        path, session_class=OpenERPSession
+    )
     session_store = http.Root().session_store
     filename_prefix_len = len('werkzeug_')
     filename_suffix_len = len('.sess')
@@ -90,7 +95,7 @@ def copy_fs_sessions(path):
         session_store.save(session)
 
 
-if is_true(os.environ.get('ODOO_SESSION_REDIS')):
+if is_true('ODOO_SESSION_REDIS'):
     if sentinel_host:
         _logger.debug("HTTP sessions stored in Redis with prefix '%s'. "
                       "Using Sentinel on %s:%s",
@@ -102,8 +107,8 @@ if is_true(os.environ.get('ODOO_SESSION_REDIS')):
     http.Root.session_store = session_store
     http.session_gc = session_gc
 
-    if is_true(os.environ.get('ODOO_SESSION_REDIS_COPY_EXISTING_FS_SESSIONS')):
+    if is_true('ODOO_SESSION_REDIS_COPY_EXISTING_FS_SESSIONS'):
         copy_fs_sessions(odoo.tools.config.session_dir)
-    if is_true(os.environ.get('ODOO_SESSION_REDIS_PURGE_EXISTING_FS_SESSIONS')):
+    if is_true('ODOO_SESSION_REDIS_PURGE_EXISTING_FS_SESSIONS'):
         # clean the existing sessions on the file system
         purge_fs_sessions(odoo.tools.config.session_dir)
